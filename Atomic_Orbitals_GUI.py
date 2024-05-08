@@ -664,11 +664,11 @@ try:
     plt.plot(r, Rnl, lw=2, color = 'blue', label = r'$R_{' + str(n) + ',' + str(l) + '}(r)$') 
 except:
     plt.plot(r, Rnl, lw=2, color = 'blue', label = 'Radial Part') 
-if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability':
+if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
     try:
         plt.plot(r, Pnl,  lw=2, color = 'red', label = r'$P_{' + str(n) + ',' + str(l) + '}(r)$')
     except:
-        plt.plot(r, Pnl,  lw=2, color = 'red', label = 'radial part')
+        plt.plot(r, Pnl,  lw=2, color = 'red', label = 'Radial part')
 if (plot_nodes or plot_radial_nodes) and len(r_nodes) > 0:
     plt.scatter(r_nodes,numpy.zeros(len(r_nodes)),marker='o',color = 'green',facecolors='none')
 plt.xlim([0,rmax])
@@ -678,7 +678,7 @@ except:
     plt.xlabel('r (a.u.)')
 if wavefunction_mode == 'scaled':
     plt.ylim([min(Rnl)-0.1,1.1])
-    if (plot_nodes or plot_radial_nodes):
+    if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
         try:
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r), P_{' + str(n) + ',' + str(l) + '}(r)$ (Scaled)')
         except:
@@ -690,7 +690,7 @@ if wavefunction_mode == 'scaled':
             plt.ylabel('Radial Part (Scaled)')
 if wavefunction_mode == 'actual':
     plt.ylim([min(Rnl)-0.1*max(max(Rnl),max(Pnl)),1.1*max(max(Rnl),max(Pnl))])
-    if (plot_nodes or plot_radial_nodes):
+    if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
         try:
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r), P_{' + str(n) + ',' + str(l) + '}(r)$')
         except:
@@ -719,7 +719,7 @@ if l > 0:
         plt.plot(theta/numpy.pi, LeP, lw=2, color = 'blue', label = r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$') 
     except:
         plt.plot(theta/numpy.pi, LeP, lw=2, color = 'blue', label = 'theta Part') 
-    if (plot_nodes or plot_theta_nodes) or plot_mode == 'probability': 
+    if (plot_nodes or plot_theta_nodes) or plot_mode == 'probability density': 
         try:
             plt.plot(theta/numpy.pi, LeP**2, lw=2, color = 'red', label = r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))^2$')
         except:
