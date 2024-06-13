@@ -59,7 +59,7 @@ Data_boxes = numpy.array([['Principal Quantum Number n: ','entry',0,0], ['Allowe
                           ['Opacity Scaling Exponent: ','entry',13,0],['Must Be 0 or Above','label',13,2],['Maximum Opacity: ','entry',13,3], ['Allowed Values in [0,1]','label',13,5],
                           ['Opacity Shift: ','entry',14,0],['Allowed Values in [0,1]','label',14,2],
                           ['Use White Background: ','check',15,0],['Outline Box: ','check',15,3],
-                          ['Round Axes to Multiples of 10 a.u.: ','check',16,0],
+                          ['Round Axes to Multiples of 10 a.u.: ','check',16,0],['Plot Component Wavefunctions: ','check',16,3],
                           ['Maximum Radial Distance (a.u.) Per n: ','drop',17,0],['Number of Grid Points Per n: ','drop',17,3],
                           ['Defaults','defaults_button',18,2],['Submit','submit_button',18,3]])
 # Options ordered in the same order they appear in Data_boxes; not all available colormaps are actually given #
@@ -68,7 +68,7 @@ Drop_options = [['seismic','coolwarm','bwr','jet','viridis','plasma','cool','hot
                 [str(2*i+6) for i in range(13)],
                 [str(5*i+10) for i in range(10)]]
 default_entry_variables = ['2','1','0','21','0.0','1.0','(0,1,0)','(0,1,0)','(0,1,0)','1.0','0.6','0.0']
-default_check_variables = [False,False,True,False,False,False,False,True,False,False]
+default_check_variables = [False,False,True,False,False,False,False,True,False,False,False]
 default_drop_variables = ['seismic','orbital','12','20']
 
 All_valid = False  #master switch that needs to be True to proceed
@@ -229,13 +229,15 @@ while All_valid == False:  #the user can't escape the GUI sequence until all the
     if checks[7] == False:
         light_mode = 'black'
     box_outline = checks[8]     #if True plots a box around the edges of the grid, if False does not
-    nice_labels = checks[9]    #if True makes axis labels a multiple of 10, if False gives real values
+    nice_labels = checks[9]     #if True makes axis labels a multiple of 10, if False gives real values
+    WF_Comp = checks[10]    #if True, plots the r, theta, and phi components of the wavefunction individually
 
     colormap = drops[0]
     plot_mode = drops[1] 
     Node_mode = 'mesh'
-    rmax = int(drops[2])*n    #Maximum distance along x,y,z (units of a_0 or a.u.). The default is sufficient for most applications
-    N = int(drops[3])*n       #number of grid points along r,x,y,z axes used throughout the program (~35*N gives high quality)
+    if QN_valid:
+        rmax = int(drops[2])*n    #Maximum distance along x,y,z (units of a_0 or a.u.). The default is sufficient for most applications
+        N = int(drops[3])*n       #number of grid points along r,x,y,z axes used throughout the program (~35*N gives high quality)
 
     if QN_valid and color_points_valid and cutoff_valid and node_opacity_valid and RGB_valid and opacity_exp_valid and opacity_max_valid and opacity_shift_valid:
         All_valid = True  #terminates the while loop and allows the program to continue
@@ -623,10 +625,10 @@ if abs(m) > 0:   #no need to plot imag orbital if m = 0
         #sign = numpy.sign(numpy.imag(Yml[indices]))*numpy.sign(Rnl[indices])  #phases from the orbital
         if wavefunction_mode == 'scaled':
             #Prob[indices] = sign*Rnl[indices]**2*numpy.imag(Yml[indices])**2/ProbMax  #retains the phase information
-            Prob[indices] = sign*Rnl[indices]**2*numpy.imag(Yml[indices])**2/ProbMax
+            Prob[indices] = Rnl[indices]**2*numpy.imag(Yml[indices])**2/ProbMax
         if wavefunction_mode == 'actual':
             #Prob[indices] = sign*Rnl[indices]**2*numpy.imag(Yml[indices])**2  #retains the phase information
-            Prob[indices] = sign*Rnl[indices]**2*numpy.imag(Yml[indices])**2
+            Prob[indices] = Rnl[indices]**2*numpy.imag(Yml[indices])**2
         if (m == 0 and m0_cut):  #turning off the first quadrant for s orbitals or orbitals with m = 0
             indices = numpy.where(numpy.logical_and(x>0,y>0))
             Prob[indices] = 0.0
@@ -645,203 +647,142 @@ mlab.show()     #only once the program gets here does it actually show anything;
 
 # Block 9 #
 # Generating plot of the radial wavefunction and radial probability density #
-plt.rcParams['figure.dpi'] = 200    #makes the figure higher resolution than the Jupyter default
-try:
-    plt.rcParams['text.usetex'] = True  #allows use of LaTeX in labels
-except:
-    print('No LaTeX Distribution Detected, Using Plain Text Labels.')
-plt.figure(num=1, figsize=(5, 3))   #size is specified because Jupyter randomly resizes things otherwise
-r = numpy.linspace(0,rmax,2*N)
-rho = 2*r/n   #convenient for calculations
-LaP = scipy.special.genlaguerre(n-l-1,2*l+1)(rho)   #radial wavefunction Laguerre polynomial part
-Rnl = Cnl*numpy.exp(-rho/2)*rho**l*LaP              #radial component of wavefunction
-Pnl = r**2*Rnl**2  #radial probability density
-if wavefunction_mode == 'scaled':
-    Rnl = Rnl/max(Rnl)   #Rescaling to max value 1
-    Pnl = Pnl/max(Pnl)   #Rescaling to max value 1
-plt.plot([0,rmax],[0,0], color = 'k', linestyle = '--')
-try:
-    plt.plot(r, Rnl, lw=2, color = 'blue', label = r'$R_{' + str(n) + ',' + str(l) + '}(r)$') 
-except:
-    plt.plot(r, Rnl, lw=2, color = 'blue', label = 'Radial Part') 
-if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
-    try:
+if WF_Comp:
+    plt.rcParams['figure.dpi'] = 200    #makes the figure higher resolution than the Jupyter default
+    plt.figure(num=1, figsize=(5, 3))   #size is specified because Jupyter randomly resizes things otherwise
+    r = numpy.linspace(0,rmax,2*N)
+    rho = 2*r/n   #convenient for calculations
+    LaP = scipy.special.genlaguerre(n-l-1,2*l+1)(rho)   #radial wavefunction Laguerre polynomial part
+    Rnl = Cnl*numpy.exp(-rho/2)*rho**l*LaP              #radial component of wavefunction
+    Pnl = r**2*Rnl**2  #radial probability density
+    if wavefunction_mode == 'scaled':
+        Rnl = Rnl/max(Rnl)   #Rescaling to max value 1
+        Pnl = Pnl/max(Pnl)   #Rescaling to max value 1
+    plt.plot([0,rmax],[0,0], color = 'k', linestyle = '--')
+    plt.plot(r, Rnl, lw=2, color = 'blue', label = r'$R_{' + str(n) + ',' + str(l) + '}(r)$')
+    if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
         plt.plot(r, Pnl,  lw=2, color = 'red', label = r'$P_{' + str(n) + ',' + str(l) + '}(r)$')
-    except:
-        plt.plot(r, Pnl,  lw=2, color = 'red', label = 'Radial part')
-if (plot_nodes or plot_radial_nodes) and len(r_nodes) > 0:
-    plt.scatter(r_nodes,numpy.zeros(len(r_nodes)),marker='o',color = 'green',facecolors='none')
-plt.xlim([0,rmax])
-try:
+    if (plot_nodes or plot_radial_nodes) and len(r_nodes) > 0:
+        plt.scatter(r_nodes,numpy.zeros(len(r_nodes)),marker='o',color = 'green',facecolors='none')
+    plt.xlim([0,rmax])
     plt.xlabel(r'$r$ (a.u.)')
-except:
-    plt.xlabel('r (a.u.)')
-if wavefunction_mode == 'scaled':
-    plt.ylim([min(Rnl)-0.1,1.1])
-    if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
-        try:
+    if wavefunction_mode == 'scaled':
+        plt.ylim([min(Rnl)-0.1,1.1])
+        if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r), P_{' + str(n) + ',' + str(l) + '}(r)$ (Scaled)')
-        except:
-            plt.ylabel('Radial Part, Radial Probability (Scaled)')
-    else:
-        try:
+        else:
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r)$ (Scaled)')
-        except:
-            plt.ylabel('Radial Part (Scaled)')
-if wavefunction_mode == 'actual':
-    plt.ylim([min(Rnl)-0.1*max(max(Rnl),max(Pnl)),1.1*max(max(Rnl),max(Pnl))])
-    if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
-        try:
+    if wavefunction_mode == 'actual':
+        plt.ylim([min(Rnl)-0.1*max(max(Rnl),max(Pnl)),1.1*max(max(Rnl),max(Pnl))])
+        if (plot_nodes or plot_radial_nodes) or plot_mode == 'probability density':
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r), P_{' + str(n) + ',' + str(l) + '}(r)$')
-        except:
-            plt.ylabel('Radial Part, Radial Probability')
-    else:
-        try:
+        else:
             plt.ylabel(r'$R_{' + str(n) + ',' + str(l) + '}(r)$')
-        except:
-            plt.ylabel('Radial Part')
-plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
-plt.tight_layout()
-plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
+    plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
+    plt.tight_layout()
+    plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
 
 # Block 10 #
 # Generating plot of the theta angular wavefunction #
-if l == 0:
-    print('Theta part is trivial since l = 0 gives P_0^0 = 1')
-if l > 0:
-    plt.figure(num=2, figsize=(5, 3))
-    theta = numpy.linspace(0,numpy.pi,N)
-    LeP = (-1)**m*Nlm*scipy.special.lpmv(m,l,numpy.cos(theta))  #We give the normalization constant to theta part
-    if wavefunction_mode == 'scaled':
-        LeP = LeP/max(LeP)
-    plt.plot([0,1],[0,0], color = 'k', linestyle = '--')
-    try:
+if WF_Comp:
+    if l == 0:
+        print('Theta part is trivial since l = 0 gives P_0^0 = 1')
+    if l > 0:
+        plt.figure(num=2, figsize=(5, 3))
+        theta = numpy.linspace(0,numpy.pi,N)
+        LeP = (-1)**m*Nlm*scipy.special.lpmv(m,l,numpy.cos(theta))  #We give the normalization constant to theta part
+        if wavefunction_mode == 'scaled':
+            LeP = LeP/max(LeP)
+        plt.plot([0,1],[0,0], color = 'k', linestyle = '--')
+        plt.xlim([0,1])
         plt.plot(theta/numpy.pi, LeP, lw=2, color = 'blue', label = r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$') 
-    except:
-        plt.plot(theta/numpy.pi, LeP, lw=2, color = 'blue', label = 'theta Part') 
-    if (plot_nodes or plot_theta_nodes) or plot_mode == 'probability density': 
-        try:
+        if (plot_nodes or plot_theta_nodes) or plot_mode == 'probability density': 
             plt.plot(theta/numpy.pi, LeP**2, lw=2, color = 'red', label = r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))^2$')
-        except:
-            plt.plot(theta/numpy.pi, LeP**2, lw=2, color = 'red', label = 'Square of theta part')
-    if (plot_nodes or plot_theta_nodes) and len(theta_nodes) > 0:
-        plt.scatter(theta_nodes/numpy.pi,numpy.zeros(len(theta_nodes)),marker='o',color = 'green',facecolors='none')
-    plt.xlim([0,1])
-    try:
+        if (plot_nodes or plot_theta_nodes) and len(theta_nodes) > 0:
+            plt.scatter(theta_nodes/numpy.pi,numpy.zeros(len(theta_nodes)),marker='o',color = 'green',facecolors='none')
         plt.xlabel(r'$\theta$ ($\pi$)')
-    except:
-        plt.xlabel('theta (pi)')
-    if wavefunction_mode == 'scaled':
-        plt.ylim([min(LeP)-0.1*max(LeP),1.1*max(LeP)])
-        if (plot_nodes or plot_theta_nodes):
-            try:
+        if wavefunction_mode == 'scaled':
+            plt.ylim([min(LeP)-0.1*max(LeP),1.1*max(LeP)])
+            if (plot_nodes or plot_theta_nodes):
                 plt.ylabel(r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$, $P_' + str(l) + '^' + str(m) + r'(\cos(\theta))^2$ (Scaled)')
-            except:
-                plt.ylabel('theta Part, Square of theta Part (Scaled)')
-        else:
-            try:
+            else:
                 plt.ylabel(r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$ (Scaled)')
-            except:
-                plt.ylabel('theta Part (Scaled)')
-    if wavefunction_mode == 'actual':
-        plt.ylim([min(LeP)-0.1*max(max(LeP),max(LeP**2)),1.1*max(max(LeP),max(LeP**2))])
-        if (plot_nodes or plot_theta_nodes):
-            try:
+        if wavefunction_mode == 'actual':
+            plt.ylim([min(LeP)-0.1*max(max(LeP),max(LeP**2)),1.1*max(max(LeP),max(LeP**2))])
+            if (plot_nodes or plot_theta_nodes):
                 plt.ylabel(r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$, $P_' + str(l) + '^' + str(m) + r'(\cos(\theta))^2$')
-            except:
-                plt.ylabel('theta Part, Square of theta Part')
-        else:
-            try:
+            else:
                 plt.ylabel(r'$P_' + str(l) + '^' + str(m) + r'(\cos(\theta))$')
-            except:
-                plt.ylabel('theta Part')
-    plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
-    plt.tight_layout()
-    plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
+        plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
+        plt.tight_layout()
+        plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
 
 # Block 11 #
 # Generating plot of the phi angular wavefunction #
-if m == 0:
-    print('Phi part is trivial since m = 0 gives exp(0) = 1')
-if abs(m) > 0 :
-    plt.figure(num=3, figsize=(5,3))
-    phi = numpy.linspace(0,2*numpy.pi,2*N)
-    F = numpy.exp(complex(0,1)*m*phi)  #the wavefunction for phi
-    plt.plot([0,2],[0,0], color = 'k', linestyle = '--')
-    if plot_nodes == True:
-        plt.plot([1,1],[-1.3,1.3], color = 'green', linestyle = '--')
-    if (plot_nodes or plot_phi_nodes):
-        if len(real_phi_nodes) > 0:
-            plt.scatter(real_phi_nodes/numpy.pi,numpy.zeros(len(real_phi_nodes)),marker='o',color = 'green',facecolors='none')
-        if len(imag_phi_nodes) > 0:
-            plt.scatter(imag_phi_nodes/numpy.pi,numpy.zeros(len(imag_phi_nodes)),marker='s',color = 'green',facecolors='none')
-    if m > 1:
-        try:
+if WF_Comp:
+    if m == 0:
+        print('Phi part is trivial since m = 0 gives exp(0) = 1')
+    if abs(m) > 0 :
+        plt.figure(num=3, figsize=(5,3))
+        phi = numpy.linspace(0,2*numpy.pi,2*N)
+        F = numpy.exp(complex(0,1)*m*phi)  #the wavefunction for phi
+        plt.plot([0,2],[0,0], color = 'k', linestyle = '--')
+        plt.xlim([0,2])
+        plt.ylim([-1.3,1.3])
+        if plot_nodes == True:
+            plt.plot([1,1],[-1.3,1.3], color = 'green', linestyle = '--')
+        if (plot_nodes or plot_phi_nodes):
+            if len(real_phi_nodes) > 0:
+                plt.scatter(real_phi_nodes/numpy.pi,numpy.zeros(len(real_phi_nodes)),marker='o',color = 'green',facecolors='none')
+            if len(imag_phi_nodes) > 0:
+                plt.scatter(imag_phi_nodes/numpy.pi,numpy.zeros(len(imag_phi_nodes)),marker='s',color = 'green',facecolors='none')
+        if m > 1:
             plt.plot(phi/numpy.pi, numpy.real(F), lw=2, color = 'blue', label = r'Re$(e^{' + str(m) + 'i \phi})$')
             plt.plot(phi/numpy.pi, numpy.imag(F), lw=2, color = 'red', label = r'Im$(e^{' + str(m) + 'i \phi})$')
-        except:
-            plt.plot(phi/numpy.pi, numpy.real(F), lw=2, color = 'blue', label = 'Real Part for phi')
-            plt.plot(phi/numpy.pi, numpy.imag(F), lw=2, color = 'red', label = 'Imaginary Part for phi')
-    if m == 1:
-        try:
+            plt.ylabel(r'Re$(e^{' + str(m) + 'i \phi})$,Im$(e^{i' + str(m) + '\phi})$')
+        if m == 1:
             plt.plot(phi/numpy.pi, numpy.real(F), lw=2, color = 'blue', label = r'Re$(e^{i \phi})$')
             plt.plot(phi/numpy.pi, numpy.imag(F), lw=2, color = 'red', label = r'Im$(e^{i \phi})$')
-        except:
-            plt.plot(phi/numpy.pi, numpy.real(F), lw=2, color = 'blue', label = 'Real Part for phi')
-            plt.plot(phi/numpy.pi, numpy.imag(F), lw=2, color = 'red', label = 'Imaginary Part for phi')
-    plt.xlim([0,2])
-    plt.ylim([-1.3,1.3])
-    try:
-        plt.xlabel(r'$\phi$ ($\pi$)')
-    except:
-        plt.xlabel('phi (pi)')
-    if m > 1:
-        try:
-            plt.ylabel(r'Re$(e^{' + str(m) + 'i \phi})$,Im$(e^{i' + str(m) + '\phi})$')
-        except:
-            plt.ylabel('Real and Imaginary Parts for phi')
-    if  m == 1:
-        try:
             plt.ylabel(r'Re$(e^{i \phi})$,Im$(e^{i \phi})$')
-        except:
-            plt.ylabel('Real and Imaginary Parts for phi')
-    plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
-    plt.tight_layout()
-    plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
+        plt.xlabel(r'$\phi$ ($\pi$)')
+        plt.legend(bbox_to_anchor=(1.05, 0.6), loc=2, borderaxespad=0.)
+        plt.tight_layout()
+        plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
 
 # Block 12 #
-plt.figure(num=4, figsize=(5, 3))
-if wavefunction_mode == 'scaled':
-    values = numpy.linspace(-1,1,colormap_points) 
-if wavefunction_mode == 'actual':
-    if plot_mode == 'orbital' or plot_mode == 'original':
-        values = numpy.linspace(-PhiMax,PhiMax,colormap_points)
+if WF_Comp:
+    plt.figure(num=4, figsize=(5, 3))
+    if wavefunction_mode == 'scaled':
+        values = numpy.linspace(-1,1,colormap_points) 
+    if wavefunction_mode == 'actual':
+        if plot_mode == 'orbital' or plot_mode == 'original':
+            values = numpy.linspace(-PhiMax,PhiMax,colormap_points)
+        if plot_mode == 'probability density':
+            values = numpy.linspace(-PhiMax**2,PhiMax**2,colormap_points)
+    plt.plot([min(values),max(values)],[0,0], color = 'k', linestyle = '--')
+    opacities = [opacity_factor*((numpy.abs(-colormap_points//2+i+1)/(colormap_points//2))**opacity_exponent)+opacity_shift for i in range(colormap_points)]
+    plt.scatter(values,color_array[:,0], lw=1, color = 'red', label = 'Red values for ' + colormap,marker='d',facecolors='none')
+    plt.scatter(values,color_array[:,1], lw=1, color = 'green', label = 'Green values for ' + colormap,marker='s',facecolors='none')
+    plt.scatter(values,color_array[:,2], lw=1, color = 'blue', label = 'Blue values for ' + colormap,marker='*',facecolors='none')
+    plt.scatter(values,opacities, lw=1, color = 'black', label = 'Opacity values',marker='o',facecolors='none')
+    plt.plot(values,color_array[:,0], lw=1, color = 'red')
+    plt.plot(values,color_array[:,1], lw=1, color = 'green')
+    plt.plot(values,color_array[:,2], lw=1, color = 'blue')
+    plt.plot(values,opacities, lw=1, color = 'black')
     if plot_mode == 'probability density':
-        values = numpy.linspace(-PhiMax**2,PhiMax**2,colormap_points)
-plt.plot([min(values),max(values)],[0,0], color = 'k', linestyle = '--')
-opacities = [opacity_factor*((numpy.abs(-colormap_points//2+i+1)/(colormap_points//2))**opacity_exponent)+opacity_shift for i in range(colormap_points)]
-plt.scatter(values,color_array[:,0], lw=1, color = 'red', label = 'Red values for ' + colormap,marker='d',facecolors='none')
-plt.scatter(values,color_array[:,1], lw=1, color = 'green', label = 'Green values for ' + colormap,marker='s',facecolors='none')
-plt.scatter(values,color_array[:,2], lw=1, color = 'blue', label = 'Blue values for ' + colormap,marker='*',facecolors='none')
-plt.scatter(values,opacities, lw=1, color = 'black', label = 'Opacity values',marker='o',facecolors='none')
-plt.plot(values,color_array[:,0], lw=1, color = 'red')
-plt.plot(values,color_array[:,1], lw=1, color = 'green')
-plt.plot(values,color_array[:,2], lw=1, color = 'blue')
-plt.plot(values,opacities, lw=1, color = 'black')
-if plot_mode == 'probability density':
-    plt.plot([1,1],[-1.1,1.1], color = 'black', linestyle = '--')  #shows that probability only uses positive values
-plt.xlim([min(values),max(values)])
-plt.ylim([-0.1,1.1])
-if plot_mode == 'orbital':
-    label_string = 'Orbital Value'
-if plot_mode == 'probability density':
-    label_string = 'Probability Density Value'
-if plot_mode == 'original':
-    label_string = 'Orbital Value'
-if wavefunction_mode == 'scaled':
-    label_string += ' (Scaled)'
-plt.xlabel(label_string)
-plt.ylabel('Map Value')
-plt.legend(bbox_to_anchor=(1.05, 0.7), loc=2, borderaxespad=0.)
-plt.tight_layout()
-plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
+        plt.plot([1,1],[-1.1,1.1], color = 'black', linestyle = '--')  #shows that probability only uses positive values
+    plt.xlim([min(values),max(values)])
+    plt.ylim([-0.1,1.1])
+    if plot_mode == 'orbital':
+        label_string = 'Orbital Value'
+    if plot_mode == 'probability density':
+        label_string = 'Probability Density Value'
+    if plot_mode == 'original':
+        label_string = 'Orbital Value'
+    if wavefunction_mode == 'scaled':
+        label_string += ' (Scaled)'
+    plt.xlabel(label_string)
+    plt.ylabel('Map Value')
+    plt.legend(bbox_to_anchor=(1.05, 0.7), loc=2, borderaxespad=0.)
+    plt.tight_layout()
+    plt.show()  #must not be shown until after the mlab.show() or else the program will freeze
